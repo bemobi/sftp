@@ -72,12 +72,12 @@ func main() {
 		log.Fatal("failed to accept incoming connection", err)
 	}
 
-	// Before use, a handshake must be performed on the incoming
-	// net.Conn.
-	_, chans, reqs, err := ssh.NewServerConn(nConn, config)
+	// Before use, a handshake must be performed on the incoming net.Conn.
+	sconn, chans, reqs, err := ssh.NewServerConn(nConn, config)
 	if err != nil {
 		log.Fatal("failed to handshake", err)
 	}
+	log.Println("login detected:", sconn.User())
 	fmt.Fprintf(debugStream, "SSH server established\n")
 
 	// The incoming Request channel must be serviced.
@@ -119,24 +119,8 @@ func main() {
 			}
 		}(requests)
 
-		serverOptions := []sftp.ServerOption{
-			sftp.WithDebug(debugStream),
-		}
-
-		if readOnly {
-			serverOptions = append(serverOptions, sftp.ReadOnly())
-			fmt.Fprintf(debugStream, "Read-only server\n")
-		} else {
-			fmt.Fprintf(debugStream, "Read write server\n")
-		}
-
-		server, err := sftp.NewServer(
-			channel,
-			serverOptions...,
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
+		root := sftp.InMemHandler()
+		server := sftp.NewRequestServer(channel, root)
 		if err := server.Serve(); err == io.EOF {
 			server.Close()
 			log.Print("sftp client exited session.")
